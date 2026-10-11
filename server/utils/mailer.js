@@ -2,22 +2,29 @@ const BREVO_URL = 'https://api.brevo.com/v3';
 
 function headers() {
   return {
-    'api-key': process.env.BREVO_API_KEY,
+    'api-key': (process.env.BREVO_API_KEY || '').trim(),
     'content-type': 'application/json',
     accept: 'application/json',
   };
 }
 
 async function verifyTransport() {
-  if (!process.env.BREVO_API_KEY || !process.env.SENDER_EMAIL) {
+  const key = (process.env.BREVO_API_KEY || '').trim();
+  if (!key || !process.env.SENDER_EMAIL) {
     return console.warn('[mail] BREVO_API_KEY / SENDER_EMAIL not set. Emails will not send.');
   }
+  console.log(
+    `[mail] key length=${key.length}, starts with="${key.slice(0, 9)}", has space=${/\s/.test(key)}, has quote=${/["']/.test(key)}`
+  );
   try {
     const res = await fetch(`${BREVO_URL}/account`, { headers: headers() });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`HTTP ${res.status} - ${text}`);
+    }
     console.log('[mail] Brevo API key verified');
   } catch (err) {
-    console.warn('[mail] Brevo check failed. Emails will not send until this is fixed:', err.message);
+    console.warn('[mail] Brevo check failed:', err.message);
   }
 }
 
@@ -34,7 +41,7 @@ async function sendOne({ to, subject, body }) {
     headers: headers(),
     body: JSON.stringify({
       sender: {
-        email: process.env.SENDER_EMAIL,
+        email: (process.env.SENDER_EMAIL || '').trim(),
         name: process.env.SENDER_NAME || 'BulkMail',
       },
       to: [{ email: to }],
